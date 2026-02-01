@@ -1,49 +1,32 @@
 import User from "../models/User.js";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import { sendOtpMail } from "../utils/sendOtp.js";
 
-// SEND OTP
-export const sendOtp = async (req, res) => {
-  const { email } = req.body;
+export const forgotPassword = async (req, res) => {
+  try {
+    console.log("🔵 Forgot password API called");
 
-  const user = await User.findOne({ email });
-  if (!user) return res.status(404).json({ message: "User not found" });
+    const { email } = req.body;
 
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const user = await User.findOne({ email });
+    if (!user) {
+      console.log("❌ User not found");
+      return res.status(404).json({ message: "User not found" });
+    }
 
-  user.otp = otp;
-  user.otpExpiry = Date.now() + 5 * 60 * 1000; // 5 mins
-  await user.save();
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-  await sendOtpMail(email, otp);
+    user.otp = otp;
+    user.otpExpiry = Date.now() + 5 * 60 * 1000;
+    await user.save();
 
-  res.json({ message: "OTP sent to email" });
-};
+    console.log("📨 Sending OTP email...");
+    await sendOtpMail(email, otp);
 
-// VERIFY OTP
-export const verifyOtp = async (req, res) => {
-  const { email, otp } = req.body;
+    console.log("✅ OTP mail function finished");
 
-  const user = await User.findOne({ email });
-
-  if (!user || user.otp !== otp || user.otpExpiry < Date.now()) {
-    return res.status(400).json({ message: "Invalid or expired OTP" });
+    res.json({ message: "OTP sent successfully" });
+  } catch (error) {
+    console.error("🔥 Forgot password error:", error);
+    res.status(500).json({ message: "Server error" });
   }
-
-  user.otp = null;
-  user.otpExpiry = null;
-  await user.save();
-
-  res.json({ message: "OTP verified" });
-};
-
-// RESET PASSWORD
-export const resetPassword = async (req, res) => {
-  const { email, newPassword } = req.body;
-
-  const hashed = await bcrypt.hash(newPassword, 10);
-  await User.findOneAndUpdate({ email }, { password: hashed });
-
-  res.json({ message: "Password updated" });
 };
